@@ -4,104 +4,46 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"github.com/kevin19930919/CrtptoAlert/model"
-	"github.com/kevin19930919/CrtptoAlert/service"
+	"github.com/kevin19930919/CryptoAlert/service"
 	"net/http"
-	"strconv"
 )
 
-// @Summary add order record
-// @Accept  json
-// @Param title body service.CreateOrderByListInfo true "book-list"
-// @Success 200 {string} json "{"msg":"ok"}"
-// @Router /api/v1/order [post]
-func CreateOrder(context *gin.Context) {
-	var orderinfo service.CreateOrderByListInfo
+func AddAlert(context *gin.Context) {
+	var AddAlertInfo service.SaveAlert
 
-	if err := context.ShouldBindBodyWith(&orderinfo, binding.JSON); err != nil {
-		fmt.Println("bind order info error", err.Error())
+	// validiate adding alert info
+	if err := context.ShouldBindBodyWith(&AddAlertInfo, binding.JSON); err != nil {
+		fmt.Println("data valdation fail", err.Error())
 		context.JSON(http.StatusNotFound, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
-	// ======= get book-list record =======
-	IntListID, _ := strconv.Atoi(orderinfo.BooklistID)
-
-	booklistmodel, err := service.GetBooklistByID(IntListID)
-	if err != nil {
-		context.JSON(http.StatusNotFound, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
-	// ======get account record ========
-	var account model.Account
-	if err := model.GetAccount(&account, booklistmodel.BooklistModel.AccountEmail); err != nil {
+	// adding alert
+	if err := service.AddAlert(&AddAlertInfo); err != nil {
 		context.JSON(http.StatusNotFound, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	// iter to place order
-	fmt.Println("==========", orderinfo.Orders)
-	for i := 0; i < len(orderinfo.Orders); i++ {
-		// ======= get book record ========
-		var book model.Book
-
-		if err := model.GetBookByID(&book, orderinfo.Orders[i].BookID); err != nil {
-			context.JSON(http.StatusNotFound, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-		// ===== check book status ======
-		bookinter := service.Book{orderinfo.Orders[i].BookID}
-		fmt.Println("====", bookinter)
-		status, err := bookinter.CheckBookAvaliable()
-		fmt.Println("====", status)
-		if err != nil {
-			context.JSON(http.StatusNotFound, gin.H{
-				"error": err.Error(),
-			})
-			return
-		} else if status == false {
-			continue
-		} else {
-
-		}
-
-		// ==========   ============
-		var order model.Order
-		if err := service.CreateOderRemoveList(&order, orderinfo.Orders[i].Days, &book, &account, &(booklistmodel.BooklistModel)); err != nil {
-			context.JSON(http.StatusNotFound, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-	}
-
-	fmt.Println("success create order record")
-	context.JSON(http.StatusOK, booklistmodel.BooklistModel)
+	fmt.Println("success add alert")
+	context.JSON(http.StatusOK, AddAlertInfo)
 }
 
-// @Summary return order
-// @Param id path string true "order_id"
-// @Success 200 {string} json "{"msg":"ok"}"
-// @Router /api/v1/order/{id} [patch]
-func ReturnOrder(context *gin.Context) {
-	var updateinfo service.Order
-	if err := context.ShouldBindBodyWith(&updateinfo, binding.JSON); err != nil {
-		fmt.Println(err.Error())
+func RemoveAlert(context *gin.Context) {
+	var Alert service.AlertBase
+	if err := context.ShouldBindBodyWith(&Alert, binding.JSON); err != nil {
+		fmt.Println("data valdation fail", err.Error())
 		context.JSON(http.StatusNotFound, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	bookinter := service.Order{updateinfo.OrderID}
-	if err := bookinter.ReturnBooks(); err != nil {
+	// remove alert
+	if err := Alert.RemoveAlert(); err != nil {
+		fmt.Println("remove alert fail", err.Error())
 		context.JSON(http.StatusNotFound, gin.H{
 			"error": err.Error(),
 		})
@@ -109,40 +51,35 @@ func ReturnOrder(context *gin.Context) {
 	}
 
 	fmt.Println("success update order")
-	context.JSON(http.StatusOK, updateinfo)
+	context.JSON(http.StatusOK, Alert)
 }
 
-// @Summary return order
-// @Param id path string true "order_id"
-// @Success 200 {string} json "{"msg":"ok"}"
-// @Router /api/v1/order/{id} [patch]
-func GetOrder(context *gin.Context) {
-	var getorderinfo service.GetOrderInfo
-	if err := context.ShouldBindUri(&getorderinfo); err != nil {
-		fmt.Println("get bind uri fail", err.Error())
+func UpdateAlert(context *gin.Context) {
+	// valdate update alert data
+	var UpdateInfo service.UpdateAlert
+	if err := context.ShouldBindBodyWith(&UpdateInfo, binding.JSON); err != nil {
+		fmt.Println("data valdation fail", err.Error())
 		context.JSON(http.StatusNotFound, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
-	var account model.Account
-	if err := model.GetAccount(&account, getorderinfo.AccountEmail); err != nil {
-		fmt.Println("get account record fail", err.Error())
-		context.JSON(http.StatusNotFound, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
-	var orderlist []model.Order
+	// initial update alert object
+	Alert := service.AlertBase{AlertID: UpdateInfo.AlertID}
 
-	if err := service.GetUnReturnOrderByAccount(&orderlist, &account); err != nil {
+	// if price, err := strconv.ParseFloat(UpdateInfo.Price, 64); err != nil {
+	// 	fmt.Println("data valdation fail", err.Error())
+	// 	context.JSON(http.StatusNotFound, gin.H{
+	// 		"error": err.Error(),
+	// 	})
+	// }
+	// UpdateInfo.Price = price
+	if err := Alert.UpdateAlert(UpdateInfo); err != nil {
+		fmt.Println("remove alert fail", err.Error())
 		context.JSON(http.StatusNotFound, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
-	fmt.Println("=======", &orderlist)
-	fmt.Println("success get booklist record")
-	context.JSON(http.StatusOK, &orderlist)
-
+	context.JSON(http.StatusOK, UpdateInfo)
 }
